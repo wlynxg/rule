@@ -1,31 +1,23 @@
-name: Deploy Clash Rules
+name: Deploy Clash Rules to Gist
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'sources/**'
-      - 'scripts/**'
-      - '.github/workflows/**'
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # 每天 UTC 02:00 自动运行
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+    - cron: '0 2 * * *'
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    env:
+      GIST_TOKEN: ghp_VG...jutr
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          token: ghp_VG...jutr
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,18 +27,51 @@ jobs:
       - name: Generate Clash rules
         run: python scripts/generate.py
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist/
+      - name: Deploy to Gist
+        run: |
+          set -e
+          pip install pynacl -q
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          PROXY_YAML=$(cat dist/proxy.yaml)
+          DIRECT_YAML=$(cat dist/direct.yaml)
+          REJECT_YAML=$(cat dist/reject.yaml)
+
+          if [ -f .gist_id ]; then
+            GIST_ID=$(cat .gist_id)
+            echo "Updating Gist: $GIST_ID"
+            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
+              -H "Authorization: token $GIST_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d "$(jq -n \
+                --arg desc "Clash Rule Provider - Auto Updated" \
+                --arg proxy "$PROXY_YAML" \
+                --arg direct "$DIRECT_YAML" \
+                --arg reject "$REJECT_YAML" \
+                '{description:$desc,files:{"proxy.yaml":{content:$proxy},"direct.yaml":{content:$direct},"reject.yaml":{content:$reject}}}')"
+          else
+            echo "Creating new Gist..."
+            RESPONSE=$(curl -s -X POST https://api.github.com/gists \
+              -H "Authorization: token $GIST_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d "$(jq -n \
+                --arg desc "Clash Rule Provider - Auto Updated" \
+                --arg proxy "$PROXY_YAML" \
+                --arg direct "$DIRECT_YAML" \
+                --arg reject "$REJECT_YAML" \
+                '{description:$desc,public:true,files:{"proxy.yaml":{content:$proxy},"direct.yaml":{content:$direct},"reject.yaml":{content:$reject}}}')")
+            GIST_ID=$(echo "$RESPONSE" | jq -r '.id')
+            echo "Created Gist: $GIST_ID"
+            echo "$GIST_ID" > .gist_id
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .gist_id
+            git commit -m "save gist id: $GIST_ID"
+            git push
+          fi
+
+          echo ""
+          echo "============================================"
+          echo "  Proxy:  https://gist.githubusercontent.com/wlynxg/${GIST_ID}/raw/proxy.yaml"
+          echo "  Direct: https://gist.githubusercontent.com/wlynxg/${GIST_ID}/raw/direct.yaml"
+          echo "  Reject: https://gist.githubusercontent.com/wlynxg/${GIST_ID}/raw/reject.yaml"
+          echo "============================================"
