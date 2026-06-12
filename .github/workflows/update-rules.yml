@@ -17,26 +17,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build single rule file
+      - name: Build rule files
         run: |
-          OUTFILE=/tmp/rule.yaml
-          {
-            echo "# Clash Rule Provider - Auto Generated"
-            echo "# $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
-            echo "# Source: https://github.com/${{ github.repository }}"
-            for f in sources/*.txt; do
-              grep -v '^#' "$f" | grep -v '^$' | sort -u | while read -r domain; do
-                if [[ "$domain" == \** ]]; then
-                  echo "DOMAIN-SUFFIX,${domain#\*}"
-                else
-                  echo "DOMAIN-SUFFIX,$domain"
-                fi
-              done
-            done
-          } > "$OUTFILE"
+          mkdir -p /tmp/dist
+          HEADER="# Generated $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
 
-          echo "=== Generated rule.yaml ==="
-          cat "$OUTFILE"
+          for category in direct proxy reject; do
+            src="sources/${category}.txt"
+            outfile="/tmp/dist/${category}.list"
+            echo "$HEADER" > "$outfile"
+            if [ -f "$src" ]; then
+              grep -v '^#' "$src" | grep -v '^$' | sed 's/^\*\.//' | sort -u >> "$outfile"
+            fi
+            echo "=== ${category}.list ==="
+            cat "$outfile"
+          done
 
       - name: Commit to release branch
         run: |
@@ -44,15 +39,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan release
           git rm -rf .
-          cp /tmp/rule.yaml ./rule.yaml
-          git add rule.yaml
+          cp /tmp/dist/*.list ./
+          git add *.list
           git commit -m "release: $(date -u '+%Y-%m-%d %H:%M:%S')"
           git push -f origin release
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Latest Rules
-          make_latest: true
-          files: /tmp/rule.yaml
