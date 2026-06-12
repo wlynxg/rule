@@ -1,2 +1,2 @@
 # proxy domains
-hermes-agent.nousresearch.com
+nousresearch.com
