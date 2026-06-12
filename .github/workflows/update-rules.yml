@@ -20,14 +20,15 @@ jobs:
       - name: Build rule files
         run: |
           mkdir -p /tmp/dist
-          HEADER="# Generated $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
 
           for category in direct proxy reject; do
             src="sources/${category}.txt"
             outfile="/tmp/dist/${category}.list"
-            echo "$HEADER" > "$outfile"
+            true > "$outfile"
             if [ -f "$src" ]; then
-              grep -v '^#' "$src" | grep -v '^$' | sed 's/^\*\.//' | sort -u >> "$outfile"
+              grep -v '^#' "$src" | grep -v '^$' | sed 's/^\*\.//' | sort -u | while read -r domain; do
+                echo "DOMAIN-SUFFIX,$domain"
+              done >> "$outfile"
             fi
             echo "=== ${category}.list ==="
             cat "$outfile"
