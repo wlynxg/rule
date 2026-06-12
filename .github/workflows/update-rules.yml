@@ -17,43 +17,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate unified rule.yaml
+      - name: Build single rule file
         run: |
-          TAG=$(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
+          # Build combined rule file in /tmp to avoid path conflicts
+          OUTFILE=/tmp/rule.yaml
           {
             echo "# Clash Rule Provider - Auto Generated"
-            echo "# $TAG"
-            echo "# Source: https://github.com/wlynxg/rule"
+            echo "# $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
+            echo "# Source: https://github.com/${{ github.repository }}"
             echo ""
             echo "payload:"
-
-            # Proxy rules
-            if [ -s sources/proxy.txt ]; then
-              echo "  # === Proxy ==="
-              grep -v '^#' sources/proxy.txt | grep -v '^$' | sort -u | while read domain; do
-                echo "  - DOMAIN-SUFFIX,$domain"
+            for f in sources/*.txt; do
+              name=$(basename "$f" .txt | tr '[:lower:]' '[:upper:]')
+              echo "  # === $name ==="
+              # Process: strip comments, strip blanks, sort, dedup, output as DOMAIN-SUFFIX rules
+              grep -v '^#' "$f" | grep -v '^$' | sort -u | while read -r domain; do
+                if [[ "$domain" == \** ]]; then
+                  echo "  - DOMAIN-SUFFIX,${domain#\*}"
+                else
+                  echo "  - DOMAIN-SUFFIX,$domain"
+                fi
               done
-            fi
-
-            # Direct rules
-            if [ -s sources/direct.txt ]; then
-              echo "  # === Direct ==="
-              grep -v '^#' sources/direct.txt | grep -v '^$' | sort -u | while read domain; do
-                echo "  - DOMAIN-SUFFIX,$domain"
-              done
-            fi
-
-            # Reject rules
-            if [ -s sources/reject.txt ]; then
-              echo "  # === Reject ==="
-              grep -v '^#' sources/reject.txt | grep -v '^$' | sort -u | while read domain; do
-                echo "  - DOMAIN-SUFFIX,$domain"
-              done
-            fi
-          } > rule.yaml
+            done
+          } > "$OUTFILE"
 
           echo "=== Generated rule.yaml ==="
-          cat rule.yaml
+          cat "$OUTFILE"
 
       - name: Commit to release branch
         run: |
@@ -61,9 +50,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan release
           git rm -rf .
-          cp rule.yaml .
-          git add .
-          git commit -m "release: $(date -u +%Y%m%d-%H%M%S)"
+          cp /tmp/rule.yaml ./rule.yaml
+          git add rule.yaml
+          git commit -m "release: $(date -u '+%Y-%m-%d %H:%M:%S')"
           git push -f origin release
 
       - name: Create GitHub Release
@@ -72,4 +61,4 @@ jobs:
           tag_name: latest
           name: Latest Rules
           make_latest: true
-          files: rule.yaml
+          files: /tmp/rule.yaml
