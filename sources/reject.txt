@@ -1,1 +1,1 @@
-# 拦截域名列表
+# reject domains

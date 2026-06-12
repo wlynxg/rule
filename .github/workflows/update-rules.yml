@@ -1,38 +1,50 @@
-name: Deploy Clash Rules
+name: Build and Release Rules
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'sources/**'
   workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
+  schedule:
+    - cron: '0 22 * * *'  # UTC 22:00 = 北京 06:00
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: python scripts/generate.py
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist/
+    permissions:
+      contents: write
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - id: deploy
-        uses: actions/deploy-pages@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate clean rule files
+        run: |
+          mkdir -p output
+          for f in sources/*.txt; do
+            name=$(basename "$f")
+            # 去掉注释和空行，排序去重
+            grep -v '^#' "$f" | grep -v '^$' | sort -u > "output/$name"
+          done
+          echo "Generated rules:"
+          wc -l output/*.txt
+
+      - name: Commit to release branch
+        run: |
+          cp output/*.txt .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b release
+          git add -f *.txt
+          timestamp=$(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "release: $timestamp" || echo "No changes"
+          git push -f origin release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rule-$(date -u '+%Y%m%d')
+          name: Clash Rules $(date -u '+%Y-%m-%d')
+          files: output/*.txt
+          generate_release_notes: true
