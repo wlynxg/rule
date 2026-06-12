@@ -1,4 +1,4 @@
-name: Update Clash Rules to Gist
+name: Deploy Clash Rules
 
 on:
   push:
@@ -11,10 +11,18 @@ on:
   schedule:
     - cron: '0 2 * * *'  # 每天 UTC 02:00 自动运行
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  update-gist:
+  build:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -27,73 +35,18 @@ jobs:
       - name: Generate Clash rules
         run: python scripts/generate.py
 
-      - name: Create or Update Gist
-        env:
-          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
-        run: |
-          #!/bin/bash
-          set -e
-          
-          GIST_ID="${{ secrets.GIST_ID }}"
-          DESCRIPTION="Clash Rule Provider - Auto Updated"
-          
-          # Read generated files
-          PROXY_YAML=$(cat dist/proxy.yaml)
-          DIRECT_YAML=$(cat dist/direct.yaml)
-          REJECT_YAML=$(cat dist/reject.yaml)
-          
-          # Build JSON payload using jq
-          if [ -z "$GIST_ID" ]; then
-            echo "GIST_ID not set, creating new Gist..."
-            RESULT=$(curl -s -X POST https://api.github.com/gists \
-              -H "Authorization: token $GH_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -d "$(jq -n \
-                --arg desc "$DESCRIPTION" \
-                --arg proxy "$PROXY_YAML" \
-                --arg direct "$DIRECT_YAML" \
-                --arg reject "$REJECT_YAML" \
-                '{
-                  description: $desc,
-                  public: true,
-                  files: {
-                    "proxy.yaml": { content: $proxy },
-                    "direct.yaml": { content: $direct },
-                    "reject.yaml": { content: $reject }
-                  }
-                }')"
-            )
-            NEW_GIST_ID=$(echo "$RESULT" | jq -r '.id')
-            echo "============================================"
-            echo "Created new Gist: $NEW_GIST_ID"
-            echo "Please add this as repository secret GIST_ID"
-            echo "URL: https://gist.github.com/$NEW_GIST_ID"
-            echo "============================================"
-          else
-            echo "Updating existing Gist: $GIST_ID"
-            curl -s -X PATCH "https://api.github.com/gists/$GIST_ID" \
-              -H "Authorization: token $GH_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -d "$(jq -n \
-                --arg desc "$DESCRIPTION" \
-                --arg proxy "$PROXY_YAML" \
-                --arg direct "$DIRECT_YAML" \
-                --arg reject "$REJECT_YAML" \
-                '{
-                  description: $desc,
-                  files: {
-                    "proxy.yaml": { content: $proxy },
-                    "direct.yaml": { content: $direct },
-                    "reject.yaml": { content: $reject }
-                  }
-                }')"
-            echo "Gist updated: https://gist.github.com/$GIST_ID"
-          fi
-          
-          echo ""
-          echo "=== Clash Rule URLs ==="
-          if [ -n "$GIST_ID" ]; then
-            echo "Proxy:  https://gist.githubusercontent.com/wlynxg/${GIST_ID}/raw/proxy.yaml"
-            echo "Direct: https://gist.githubusercontent.com/wlynxg/${GIST_ID}/raw/direct.yaml"
-            echo "Reject: https://gist.githubusercontent.com/wlynxg/${GIST_ID}/raw/reject.yaml"
-          fi
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

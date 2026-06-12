@@ -1,6 +1,6 @@
 # Clash Rule Manager
 
-Private repo + GitHub Action + Public Gist 方式管理 Clash 规则。
+Private Repo + GitHub Action + GitHub Pages 方式管理 Clash 规则。
 
 ## 工作原理
 
@@ -9,7 +9,7 @@ sources/*.txt (域名列表)
     ↓ scripts/generate.py
 dist/*.yaml (Clash rule-provider 格式)
     ↓ GitHub Action
-Public Gist (可订阅的规则链接)
+GitHub Pages (公开可订阅的规则链接)
 ```
 
 ## 目录结构
@@ -23,22 +23,18 @@ Public Gist (可订阅的规则链接)
 │   └── generate.py    # 生成 Clash rule-provider YAML
 ├── dist/              # 生成的规则文件 (gitignored)
 └── .github/workflows/
-    └── update-rules.yml
+    └── deploy-rules.yml
 ```
 
-## 使用方法
+## 订阅链接
 
-### 添加规则
+推送代码后自动部署到 GitHub Pages：
 
-编辑 `sources/` 下的对应文件，每行一个域名：
+- **代理规则**: `https://wlynxg.github.io/rule/proxy.yaml`
+- **直连规则**: `https://wlynxg.github.io/rule/direct.yaml`
+- **拦截规则**: `https://wlynxg.github.io/rule/reject.yaml`
 
-```
-# sources/proxy.txt
-example.com
-*.google.com
-```
-
-### 在 Clash 中订阅
+## 在 Clash 中使用
 
 在 `rule-providers` 中配置：
 
@@ -47,22 +43,20 @@ rule-providers:
   my-proxy:
     type: http
     behavior: classical
-    url: "https://gist.githubusercontent.com/<user>/<gist_id>/raw/proxy.yaml"
+    url: "https://wlynxg.github.io/rule/proxy.yaml"
     interval: 86400
     path: ./ruleset/my-proxy.yaml
-```
 
-然后在 `rules` 中引用：
-
-```yaml
 rules:
   - RULE-SET,my-proxy,Proxy
   - MATCH,DIRECT
 ```
 
-## 首次设置
+## 添加规则
 
-1. 创建一个 Public Gist（内容随意）
-2. 在仓库 Settings → Secrets 中添加：
-   - `GIST_TOKEN`: GitHub PAT (需要 `gist` 权限)
-   - `GIST_ID`: Gist 的 ID（URL 中那串哈希）
+编辑 `sources/` 下的对应文件，每行一个域名，然后 push：
+
+```bash
+echo "example.com" >> sources/proxy.txt
+git add . && git commit -m "add example.com" && git push
+```
