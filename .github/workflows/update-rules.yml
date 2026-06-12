@@ -19,23 +19,17 @@ jobs:
 
       - name: Build single rule file
         run: |
-          # Build combined rule file in /tmp to avoid path conflicts
           OUTFILE=/tmp/rule.yaml
           {
             echo "# Clash Rule Provider - Auto Generated"
             echo "# $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
             echo "# Source: https://github.com/${{ github.repository }}"
-            echo ""
-            echo "payload:"
             for f in sources/*.txt; do
-              name=$(basename "$f" .txt | tr '[:lower:]' '[:upper:]')
-              echo "  # === $name ==="
-              # Process: strip comments, strip blanks, sort, dedup, output as DOMAIN-SUFFIX rules
               grep -v '^#' "$f" | grep -v '^$' | sort -u | while read -r domain; do
                 if [[ "$domain" == \** ]]; then
-                  echo "  - DOMAIN-SUFFIX,${domain#\*}"
+                  echo "DOMAIN-SUFFIX,${domain#\*}"
                 else
-                  echo "  - DOMAIN-SUFFIX,$domain"
+                  echo "DOMAIN-SUFFIX,$domain"
                 fi
               done
             done
