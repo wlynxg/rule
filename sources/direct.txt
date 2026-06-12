@@ -1,3 +1,2 @@
 # direct domains
 # Add your direct domains here, one per line
-example.com
