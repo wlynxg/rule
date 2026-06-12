@@ -1,0 +1,3 @@
+# 需要走代理的域名列表
+# 每行一个域名，支持注释
+hermes-agent.nousresearch.com
