@@ -17,77 +17,47 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate merged rule file
+      - name: Generate combined rule file
         run: |
-          mkdir -p output
+          OUTPUT="rule.yaml"
+          echo "# Clash Rule Provider - Auto Generated" > "$OUTPUT"
+          echo "# $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> "$OUTPUT"
+          echo "# Source: https://github.com/${{ github.repository }}" >> "$OUTPUT"
+          echo "" >> "$OUTPUT"
+          echo "payload:" >> "$OUTPUT"
 
-          merge_sources() {
-            local section_name="$1"
-            local header="$2"
-            shift 2
-            echo ""
-            echo "## ${header}"
-            echo ""
-            for f in "$@"; do
-              if [ -f "$f" ]; then
-                grep -v '^#' "$f" | grep -v '^$'
-              fi
-            done | sort -u
-          }
-
-          # Generate clash ruleset with all rules
-          {
-            echo "# Clash Rule Provider - Auto Generated"
-            echo "# $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)"
-            echo "# Source: https://github.com/wlynxg/rule"
-            echo ""
-            echo "payload:"
-
-            # Proxy rules
-            if [ -f sources/proxy.txt ]; then
-              proxy=$(grep -v '^#' sources/proxy.txt | grep -v '^$' | sort -u)
-              if [ -n "$proxy" ]; then
-                echo "  # === Proxy ==="
-                while IFS= read -r domain; do
-                  echo "  - DOMAIN-SUFFIX,${domain}"
-                done <<< "$proxy"
-              fi
+          for f in sources/*.txt; do
+            name=$(basename "$f" .txt | tr '[:lower:]' '[:upper:]')
+            rules=$(grep -v '^#' "$f" | grep -v '^$' | sort -u)
+            if [ -n "$rules" ]; then
+              echo "  # === $name ===" >> "$OUTPUT"
+              echo "$rules" | while read -r domain; do
+                # *.domain → DOMAIN-SUFFIX
+                if [[ "$domain" == \** ]]; then
+                  echo "  - DOMAIN-SUFFIX,${domain#\*.}" >> "$OUTPUT"
+                else
+                  echo "  - DOMAIN-SUFFIX,$domain" >> "$OUTPUT"
+                fi
+              done
             fi
+          done
 
-            # Direct rules
-            if [ -f sources/direct.txt ]; then
-              direct=$(grep -v '^#' sources/direct.txt | grep -v '^$' | sort -u)
-              if [ -n "$direct" ]; then
-                echo "  # === Direct ==="
-                while IFS= read -r domain; do
-                  echo "  - DOMAIN-SUFFIX,${domain}"
-                done <<< "$direct"
-              fi
-            fi
-
-            # Reject rules
-            if [ -f sources/reject.txt ]; then
-              reject=$(grep -v '^#' sources/reject.txt | grep -v '^$' | sort -u)
-              if [ -n "$reject" ]; then
-                echo "  # === Reject ==="
-                while IFS= read -r domain; do
-                  echo "  - DOMAIN-SUFFIX,${domain}"
-                done <<< "$reject"
-              fi
-            fi
-          } > output/rules.yaml
+          # Ensure at least one payload entry
+          if ! grep -q '^\s*- ' "$OUTPUT"; then
+            echo "  - DOMAIN,placeholder.example.com" >> "$OUTPUT"
+          fi
 
           echo "=== Generated ==="
-          cat output/rules.yaml
+          cat "$OUTPUT"
 
       - name: Commit to release branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan release
-          git rm -rf .
-          cp output/* .
-          git add .
+          git rm -rf . 2>/dev/null || true
+          cp rule.yaml .
+          git add rule.yaml
           git commit -m "release: $(date -u +%Y%m%d-%H%M%S)"
           git push -f origin release
 
@@ -97,4 +67,4 @@ jobs:
           tag_name: latest
           name: Latest Rules
           make_latest: true
-          files: output/*
+          files: rule.yaml
