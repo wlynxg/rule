@@ -11,13 +11,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      GIST_TOKEN: ghp_VG...jutr
+      GIST_TOKEN: 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
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          token: ghp_VG...jutr
+          token: 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
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,7 +30,6 @@ jobs:
       - name: Deploy to Gist
         run: |
           set -e
-          pip install pynacl -q
 
           PROXY_YAML=$(cat dist/proxy.yaml)
           DIRECT_YAML=$(cat dist/direct.yaml)
