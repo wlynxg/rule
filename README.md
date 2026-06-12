@@ -1,59 +1,48 @@
 # Clash Rule Manager
 
-Private source + GitHub Action → Release 发布 Clash 规则。
+Private Repo + GitHub Action 方式管理 Clash 规则。
+
+## 工作原理
+
+```
+sources/*.txt (域名列表)
+    ↓ GitHub Action
+单个 rules.yaml (Clash rule-provider 格式)
+    ↓ 提交到 release 分支 + 创建 GitHub Release
+公开可订阅的规则链接
+```
 
 ## 目录结构
 
 ```
 ├── sources/
-│   ├── proxy.txt      # 代理域名（每行一个）
+│   ├── proxy.txt      # 需要走代理的域名
 │   ├── direct.txt     # 直连域名
 │   └── reject.txt     # 拦截域名
 └── .github/workflows/
-    └── release.yml    # 自动构建并发布 Release
+    └── update-rules.yml
 ```
 
-## 规则链接
-
-| 规则 | 链接 |
-|------|------|
-| 代理 | `https://raw.githubusercontent.com/wlynxg/rule/release/proxy.txt` |
-| 直连 | `https://raw.githubusercontent.com/wlynxg/rule/release/direct.txt` |
-| 拦截 | `https://raw.githubusercontent.com/wlynxg/rule/release/reject.txt` |
-
-## Clash 配置
+## 订阅链接
 
 ```yaml
 rule-providers:
-  proxy:
+  rules:
     type: http
     behavior: domain
-    url: "https://raw.githubusercontent.com/wlynxg/rule/release/proxy.txt"
-    path: ./ruleset/proxy.yaml
-    interval: 86400
-  direct:
-    type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/wlynxg/rule/release/direct.txt"
-    path: ./ruleset/direct.yaml
-    interval: 86400
-  reject:
-    type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/wlynxg/rule/release/reject.txt"
-    path: ./ruleset/reject.yaml
+    url: "https://raw.githubusercontent.com/wlynxg/rule/release/rules.yaml"
+    path: ./ruleset/rules.yaml
     interval: 86400
 
 rules:
-  - RULE-SET,reject,REJECT
-  - RULE-SET,proxy,PROXY
-  - RULE-SET,direct,DIRECT
-  - MATCH,PROXY
+  - RULE-SET,rules,PROXY
+  - MATCH,DIRECT
 ```
 
 ## 添加规则
 
-编辑 `sources/` 下的文件，push 后自动发布：
+编辑 `sources/` 下的对应文件，每行一个域名，然后 push：
+
 ```bash
 echo "example.com" >> sources/proxy.txt
 git add . && git commit -m "add example.com" && git push
