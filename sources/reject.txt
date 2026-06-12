@@ -1,2 +1,1 @@
 # reject domains
-# Add your reject domains here, one per line
