@@ -1,2 +1,3 @@
 # proxy domains
 nousresearch.com
+neon.tech
