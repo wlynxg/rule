@@ -1,3 +1,4 @@
 # proxy domains
 nousresearch.com
 neon.tech
+hboom.ai
