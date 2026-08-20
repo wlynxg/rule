@@ -1,6 +1,4 @@
 # proxy domains
 nousresearch.com
 neon.tech
-hboom.ai
-hbapis.com
 92.run
